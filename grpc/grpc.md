@@ -1,54 +1,64 @@
-https://github.com/grpc/grpc
-
 # gRPC 是什么？
-与许多 RPC 系统类似，gRPC 也是基于以下理念：定义一个服务，指定其能够被远程调用的方法（包含参数和返回类型）。在服务端实现这个接口，并运行一个 gRPC 服务器来处理客户端调用。
+[grpc](https://grpc.io) 是 Google 开源的、高性能的通用 RPC 框架，可以 跨语言和平台 工作！它默认使用 Protocol Buffers 来描述服务接口和基础消息交换格式
 
-gRPC  是一个高性能、开源和通用的 RPC 框架，面向移动和 HTTP/2 设计。目前提供 C、Java 和 Go 语言版本，分别是：grpc, grpc-java, grpc-go. 其中 C 版本支持 C, C++, Node.js, Python, Ruby, Objective-C, PHP 和 C# 支持。
+与许多 RPC 系统一样，gRPC 基于定义服务的思想，指定其能够被远程调用的方法（包含其参数和返回类型）：
 
-gRPC 基于 HTTP/2 标准设计，带来诸如双向流、流控、头部压缩、单 TCP 连接上的多复用请求等特。这些特性使得其在移动设备上表现更好，更省电和节省空间占用。
-
+在服务器端，服务器实现此服务接口并运行 gRPC 服务器来处理客户端调用
+在客户端，会有一个 stub (referred to as just a client in some languages) ，that provides the same methods as the server
 
 ![](grpc.png)
 
-# 使用 protocol buffers
-gRPC 默认使用 protocol buffers，这是 Google 开源的一套成熟的结构数据序列化机制（当然也可以使用其他数据格式如 JSON）
+如上图所示，gRPC 客户端和服务器可以在各种环境中相互运行和通信，Client / Server 都可以使用任何 gRPC 支持的语言来编写
 
-建议使用 proto3，因为这样可以使用 gRPC 支持全部范围的的语言，并且能避免 proto2 客户端与 proto3 服务端交互时出现的兼容性问题
+在 gRPC 中，客户端 应用程序可以像调用本地对象一样，直接调用不同计算机上的 服务端 应用程序中的方法，这样就可以更轻松地创建分布式应用程序和服务
 
-## 安装 golang protobuf
-go get -u github.com/golang/protobuf/proto // golang protobuf 库
+# protocol buffers v3
+Protocol Buffers 是 Google 开源的，一种与语言无关，平台无关，可扩展的，用来将结构化数据序列化成 二进制数据编码格式 的方法，用于通信协议，数据存储等。RPC 调用过程中客户端和服务端必须基于同一种 基础消息交换格式，才能让双方明白需要交换的数据到底代表什么意思！ 不同的 RPC 框架可能选用的编解码协议各不相同，比如 gob、JSON、messagepack 等，相比于 JSON 或 XML 这种 文本数据编码格式 而言，Protocol Buffers 的数据体积更小、读写速度更快
 
-# 定义服务
-使用 protocol buffers 接口定义语言来定义服务方法，用 protocol buffer 来定义参数和返回类型。客户端和服务端均使用服务定义生成的接口代码。
+gRPC 目前使用 Protocol Buffers V3（简称 proto3），它是 proto2 的升级版，性能更优，并增加了对 iOS 和 Android 等移动设备的支持
 
+在 Protocol Buffers 中需要被序列化的数据，会被构造成 消息，每个消息可以包含一些字段
 ```
-syntax = "proto3";	// 声明使用 proto3 语法
-
-package test;
-
-service Test {
-  rpc Hello (HelloRequest) returns (HelloReply) {}
-}
-
-message HelloRequest {
-  string name = 1;		// 每个字段都要指定数据类型
-  int age 2;   			//这里的数字2 是标识符，最小的标识号可以从1开始，最大到2^29 - 1, or 536,870,911。不可以使用其中的[19000－19999]
-}
-
-message HelloReply {
-  string message = 1;
+// Defining A Message Type
+message Person {
+  string name = 1;
+  int32 id = 2;
+  bool has_ponycopter = 3;
 }
 ```
-- 第一行指定使用 proto3 语法：如果不指定，编译器会使用 proto2。这个指定语法必须是文件的非空非注释的第一行。
-- SearchRequest消息格式有三个字段，在消息中承载的数据分别对应于每一个字段。其中每个字段都有一个名字和一种类型。
-- 向.proto文件添加注释，可以使用C/C++/java风格的双斜杠(//) 语法格式。
-- 在消息体中，每个字段都有唯一的一个数字标识符。这些标识符用来在消息的二进制格式中识别各个字段，一旦开始使用就不能再改变。[1,15]之内的标识号在编码的时候会占用一个字节。[16,2047]之内的标识号则占用2个字节。所以应该为那些频繁出现的消息元素保留 [1,15]之内的标识号。
+上面的消息中 3 个字段的类型都是简单的 标量值类型（scalar types），另外，你还可以为字段指定复合类型，比如 枚举类型（enumerations） ，消息也支持 嵌套（Nested Types），在一个消息中包含另一个消息类型：
+```
+message Person {
+  string name = 1;
+  int32 id = 2;  // Unique ID number for this person.
+  string email = 3;
 
-## 关键字
-- required: 字段必选
-- optional：字段选填，不填就会使用默认值，默认数值类型的默认值为0，string类型为空字符串，枚举类型为第一个枚举值
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    string number = 1;
+    PhoneType type = 2;
+  }
+
+  repeated PhoneNumber phones = 4;
+
+  google.protobuf.Timestamp last_updated = 5;
+}
+
+// Our address book file is just one of these.
+message AddressBook {
+  repeated Person people = 1;
+}
+```
+- 消息格式有三个字段，在消息中承载的数据分别对应于每一个字段。其中每个字段都有类型、名字、标识符
+- 最小的标识号可以从1开始，最大到2^29 - 1, or 536,870,911。不可以使用其中的[19000－19999]
 - repeated：数组类型，可以放入多个类型实例
-- proto3不支持proto2中的required和optional
+- enum： 枚举类型，第一个的标识符必须为0
+- map： map类型，key可以为整数、字符串，value可以是除了map之外的任意类型
 
 ## 保留字段与标识符
 可以使用reserved关键字指定保留字段和保留标识符
@@ -60,27 +70,6 @@ message Foo {
 ```
 > 注意，不能在一个reserved声明中混合字段名和标识符
 
-## 数值类型
-一个标量消息字段可以含有一个如下的类型——该表格展示了定义于.proto文件中的类型，以及与之对应的、在自动生成的访问类中定义的类型：
-
-
-proto Type|	Notes|	C++ Type|	Java Type|	Python Type[2]|	Go Type|	Ruby Type
-----------|------|-----|--|----|---|--------------
-double|	|	double|	double|	float|	float64|	Float|
-float|	|	float|	float|	float|	float32|	Float|
-int32|	使用变长编码，对于负值的效率很低，如果你的域有可能有负值，请使用sint64替代|	int32|	int|	int|	int32|	Fixnum 或者 Bignum（根据需要）
-uint32|	使用变长编码|	uint32|	int|	int/long|	uint32|	Fixnum 或者 Bignum（根据需要）
-uint64|	使用变长编码|	uint64|	long|	int/long|	uint64|	Bignum
-sint32|	使用变长编码，这些编码在负值时比int32高效的多|	int32|	int|	int|	int32|	Fixnum 或者 Bignum（根据需要）
-sint64|	使用变长编码，有符号的整型值。编码时比通常的int64高效。|	int64|	long|	int/long|	int64|	Bignum
-fixed32|	总是4个字节，如果数值总是比总是比228大的话，这个类型会比uint32高效|	uint32|	int|	int|	uint32|	Fixnum 或者 Bignum（根据需要）
-fixed64|总是8个字节，如果数值总是比总是比256大的话，这个类型会比uint64高效。	|uint64|	long|	int/long|	uint64|	Bignum
-sfixed32|	总是4个字节|	int32|	int|	int|	int32|	Fixnum 或者 Bignum（根据需要）
-sfixed64|	总是8个字节|	int64|	long|	int/long|	int64|	Bignum
-bool|		|bool|	boolean|	bool|	bool|	TrueClass/FalseClass
-string|	一个字符串必须是UTF-8编码或者7-bit ASCII编码的文本。|	string|	String|	str/unicode|	string|	String (UTF-8)
-bytes|	可能包含任意顺序的字节数据。|	string|	ByteString|	str|	[]byte	|String (ASCII-8BIT)
-
 ## 默认值
 当一个消息被解析的时候，如果被编码的信息不包含一个特定的singular元素，被解析的对象锁对应的域被设置位一个默认值，对于不同类型指定如下：
 * 对于strings，默认是一个空string
@@ -90,35 +79,86 @@ bytes|	可能包含任意顺序的字节数据。|	string|	ByteString|	str|	[]by
 * 对于枚举，默认是第一个定义的枚举值，必须为0;
 * 对于消息类型（message），域没有被设置，确切的消息是根据语言确定的，详见generated code guide对于可重复域的默认值是空（通常情况下是对应语言中空列表）
 
-## 枚举类型
-```
-message LogicalVolume {
-  string name = 1;
-  uint64 size = 2;
-  string uuid = 3;
-  enum Permissions {
-    MALFORMED_PERMISSIONS = 0;
-    WRITEABLE = 1;
-    READ_ONLY = 2;
-    READ_ONLY_ACTIVATION = 3;
-  }
-  Permissions permissions = 4;
-```
+[参考]（https://developers.google.com/protocol-buffers/docs/proto3）
 
-## 嵌套类型
-你可以在其他消息类型中定义、使用消息类型，在下面的例子中，Result消息就定义在SearchResponse消息内，如：
+# HTTP/2
+gRPC 使用 Protocol Buffers 将需要传输的数据 payload 编码成二进制数据后，采用 HTTP/2 协议进行传输
+
+[HTTP/2 和 HTTP/1.1 之间的区别](https://imagekit.io/demo/http2-vs-http1)
+
+[HTTP/2 详解](https://github.com/bagder/http2-explained/tree/master/zh)
+
+# grpc-go
+https://github.com/grpc
+gRPC 目前主要有 grpc-c、grpc-go、grpc-java、grpc-node 几种实现
+
+而我们将会使用 grpc-go 这个包，由于我们的 Go 版本为 1.12，且使用了 Go Modules 来管理包依赖关系，所以要使用 grpc-go 包只需要在源代码中 import "google.golang.org/grpc" 即可
+
+# gRPC 四类服务方法
+* 单项 RPC，即客户端发送一个请求给服务端，从服务端获取一个应答，就像一次普通的函数调用。
 ```
-message SearchResponse {
-  message Result {
-    string url = 1;
-    string title = 2;
-    repeated string snippets = 3;
-  }
-  repeated Result results = 1;
+rpc SayHello(HelloRequest) returns (HelloResponse){
+}
+```
+* 服务端流式 RPC，即客户端发送一个请求给服务端，可获取一个数据流用来读取一系列消息。客户端从返回的数据流里一直读取直到没有更多消息为止。
+```
+rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse){
+}
+```
+* 客户端流式 RPC，即客户端用提供的一个数据流写入并发送一系列消息给服务端。一旦客户端完成消息写入，就等待服务端读取这些消息并返回应答。
+```
+rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse) {
+}
+```
+* 双向流式 RPC，即两边都可以分别通过一个读写数据流来发送一系列消息。这两个数据流操作是相互独立的，所以客户端和服务端能按其希望的任意顺序读写，例如：服务端可以在写应答前等待所有的客户端消息，或者它可以先读一个消息再写一个消息，或者是读写相结合的其他方式。每个数据流里消息的顺序会被保持。
+```
+rpc BidiHello(stream HelloRequest) returns (stream HelloResponse){
 }
 ```
 
-# 生成 gRPC 代码
+# 示例
+## 安装 golang protobuf
+go get -u github.com/golang/protobuf/proto 
+
+## 定义服务
+使用 protocol buffers 接口定义语言来定义服务方法，用 protocol buffer 来定义参数和返回类型。客户端和服务端均使用服务定义生成的接口代码
+
+创建一个扩展名为 .proto 的 普通文本文件
+```
+  
+package test;
+
+service Test {
+  rpc Hello (HelloRequest) returns (HelloReply) {}
+}
+
+message HelloRequest {
+  string str_f = 1;            
+  int64 int_f = 2;                      
+  float float_f = 3;
+  map<string, string> map_str = 4;
+  message zdns {
+    int32 id = 1;
+  }
+  map<string, zdns> map_struct = 5;
+  enum Type {
+    creating = 0;              
+    running = 2;
+    updating = 3;
+    deleting = 4;
+  }
+  Type typ = 6;
+  bool bool_f = 7;
+  repeated string slicestr_f = 8;
+  HelloReply struct_f = 9;
+}
+
+message HelloReply {
+  string message = 1;
+}
+```
+
+## 生成 gRPC 代码
 一旦定义好服务，我们可以使用 protocol buffer 编译器 protoc 来生成创建应用所需的特定客户端和服务端的代码 
 
 当用protocol buffer编译器来运行.proto文件时，编译器将生成所选择语言的代码，这些代码可以操作在.proto文件中定义的消息类型，包括获取、设置字段值，将消息序列化到一个输出流中，以及从一个输入流中解析消息。
@@ -126,7 +166,36 @@ message SearchResponse {
 protoc --go_out=plugins=grpc:. test.proto 
 ```
 这生成了 test.pb.go ，包含了我们生成的客户端和服务端类，此外还有用于填充、序列化、提取 HelloRequest 和 HelloResponse 消息类型的类。
-
+```
+// 服务端接口
+type TestServer interface {
+        Hello(context.Context, *HelloRequest) (*HelloReply, error)
+}
+// 创建客户端
+func NewTestClient(cc grpc.ClientConnInterface) TestClient {
+        return &testClient{cc}
+}
+// 注册服务端
+func RegisterTestServer(s *grpc.Server, srv TestServer) {
+        s.RegisterService(&_Test_serviceDesc, srv)
+}
+type HelloRequest struct {
+        StrF                 string                       `protobuf:"bytes,1,opt,name=str_f,json=strF,proto3" json:"str_f,omitempty"`
+        IntF                 int64                        `protobuf:"varint,2,opt,name=int_f,json=intF,proto3" json:"int_f,omitempty"`
+        FloatF               float32                      `protobuf:"fixed32,3,opt,name=float_f,json=floatF,proto3" json:"float_f,omitempty"`
+        MapStr               map[string]string            `protobuf:"bytes,4,rep,name=map_str,json=mapStr,proto3" json:"map_str,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"b
+ytes,2,opt,name=value,proto3"`
+        MapStruct            map[string]*HelloRequestZdns `protobuf:"bytes,5,rep,name=map_struct,json=mapStruct,proto3" json:"map_struct,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protob
+uf_val:"bytes,2,opt,name=value,proto3"`
+        Typ                  HelloRequest_Type            `protobuf:"varint,6,opt,name=typ,proto3,enum=test.HelloRequest_Type" json:"typ,omitempty"`
+        BoolF                bool                         `protobuf:"varint,7,opt,name=bool_f,json=boolF,proto3" json:"bool_f,omitempty"`
+        SlicestrF            []string                     `protobuf:"bytes,8,rep,name=slicestr_f,json=slicestrF,proto3" json:"slicestr_f,omitempty"`
+        StructF              *HelloReply                  `protobuf:"bytes,9,opt,name=struct_f,json=structF,proto3" json:"struct_f,omitempty"`
+        XXX_NoUnkeyedLiteral struct{}                     `json:"-"`
+        XXX_unrecognized     []byte                       `json:"-"`
+        XXX_sizecache        int32                        `json:"-"`
+}
+```
 
 
 # 服务实现
@@ -234,26 +303,6 @@ func main() {
 }
 ```
 
-# gRPC 四类服务方法
-* 单项 RPC，即客户端发送一个请求给服务端，从服务端获取一个应答，就像一次普通的函数调用。
-```
-rpc SayHello(HelloRequest) returns (HelloResponse){
-}
-```
-* 服务端流式 RPC，即客户端发送一个请求给服务端，可获取一个数据流用来读取一系列消息。客户端从返回的数据流里一直读取直到没有更多消息为止。
-```
-rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse){
-}
-```
-* 客户端流式 RPC，即客户端用提供的一个数据流写入并发送一系列消息给服务端。一旦客户端完成消息写入，就等待服务端读取这些消息并返回应答。
-```
-rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse) {
-}
-```
-* 双向流式 RPC，即两边都可以分别通过一个读写数据流来发送一系列消息。这两个数据流操作是相互独立的，所以客户端和服务端能按其希望的任意顺序读写，例如：服务端可以在写应答前等待所有的客户端消息，或者它可以先读一个消息再写一个消息，或者是读写相结合的其他方式。每个数据流里消息的顺序会被保持。
-```
-rpc BidiHello(stream HelloRequest) returns (stream HelloResponse){
-}
-```
+
 
 
