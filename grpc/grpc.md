@@ -1,28 +1,24 @@
 https://github.com/grpc/grpc
 
 # gRPC 是什么？
+与许多 RPC 系统类似，gRPC 也是基于以下理念：定义一个服务，指定其能够被远程调用的方法（包含参数和返回类型）。在服务端实现这个接口，并运行一个 gRPC 服务器来处理客户端调用。
 gRPC  是一个高性能、开源和通用的 RPC 框架，面向移动和 HTTP/2 设计。目前提供 C、Java 和 Go 语言版本，分别是：grpc, grpc-java, grpc-go. 其中 C 版本支持 C, C++, Node.js, Python, Ruby, Objective-C, PHP 和 C# 支持.
 
 gRPC 基于 HTTP/2 标准设计，带来诸如双向流、流控、头部压缩、单 TCP 连接上的多复用请求等特。这些特性使得其在移动设备上表现更好，更省电和节省空间占用。
 
 在 gRPC 里客户端应用可以像调用本地对象一样直接调用另一台不同的机器上服务端应用的方法，使得您能够更容易地创建分布式应用和服务。
 
-与许多 RPC 系统类似，gRPC 也是基于以下理念：定义一个服务，指定其能够被远程调用的方法（包含参数和返回类型）。在服务端实现这个接口，并运行一个 gRPC 服务器来处理客户端调用。
-
 
 # 使用 protocol buffers
 gRPC 默认使用 protocol buffers，这是 Google 开源的一套成熟的结构数据序列化机制（当然也可以使用其他数据格式如 JSON）
 
-## Protocol buffers 版本
-尽管 protocol buffers 对于开源用户来说已经存在了一段时间，例子内使用的却一种名叫 proto3 的新风格的 protocol buffers，它拥有轻量简化的语法、一些有用的新功能，并且支持更多新语言。
-我们通常建议你在 gRPC 里使用 proto3，因为这样你可以使用 gRPC 支持全部范围的的语言，并且能避免 proto2 客户端与 proto3 服务端交互时出现的兼容性问题，反之亦然
+建议使用 proto3，因为这样可以使用 gRPC 支持全部范围的的语言，并且能避免 proto2 客户端与 proto3 服务端交互时出现的兼容性问题
 
 ## 安装 golang protobuf
 go get -u github.com/golang/protobuf/proto // golang protobuf 库
 
 # 定义服务
-创建我们例子的第一步是定义一个服务：一个 RPC 服务通过参数和返回类型来指定可以远程调用的方法。
-我们使用 protocol buffers 接口定义语言来定义服务方法，用 protocol buffer 来定义参数和返回类型。客户端和服务端均使用服务定义生成的接口代码。
+使用 protocol buffers 接口定义语言来定义服务方法，用 protocol buffer 来定义参数和返回类型。客户端和服务端均使用服务定义生成的接口代码。
 
 ```
 syntax = "proto3";	// 声明使用 proto3 语法
@@ -51,7 +47,7 @@ message HelloReply {
 - required: 字段必选。
 - optional：字段选填，不填就会使用默认值，默认数值类型的默认值为0，string类型为空字符串，枚举类型为第一个枚举值。
 - repeated：数组类型，可以放入多个类型实例。
-- proto3不支持proto2中的required和optional 
+- proto3不支持proto2中的required和optional
 
 ## 保留字段与标识符
 可以使用reserved关键字指定保留字段和保留标识符：
@@ -65,9 +61,12 @@ message Foo {
 
 ## 数值类型
 一个标量消息字段可以含有一个如下的类型——该表格展示了定义于.proto文件中的类型，以及与之对应的、在自动生成的访问类中定义的类型：
-.proto Type|	Notes|	C++ Type|	Java Type|	Python Type[2]|	Go Type|	Ruby Type
-double|		double|	double|	float|	float64|	Float|
-float|		float|	float|	float|	float32|	Float|
+
+
+proto Type|	Notes|	C++ Type|	Java Type|	Python Type[2]|	Go Type|	Ruby Type
+----------|------|-----|--|----|---|--------------
+double|	|	double|	double|	float|	float64|	Float|
+float|	|	float|	float|	float|	float32|	Float|
 int32|	使用变长编码，对于负值的效率很低，如果你的域有可能有负值，请使用sint64替代|	int32|	int|	int|	int32|	Fixnum 或者 Bignum（根据需要）
 uint32|	使用变长编码|	uint32|	int|	int/long|	uint32|	Fixnum 或者 Bignum（根据需要）
 uint64|	使用变长编码|	uint64|	long|	int/long|	uint64|	Bignum
@@ -88,7 +87,7 @@ bytes|	可能包含任意顺序的字节数据。|	string|	ByteString|	str|	[]by
 * 对于bools，默认是false
 * 对于数值类型，默认是0
 * 对于枚举，默认是第一个定义的枚举值，必须为0;
-* 对于消息类型（message），域没有被设置，确切的消息是根据语言确定的，详见generated code guide对于可重复域的默认值是空（通常情况下是对应语言中空列表）。 
+* 对于消息类型（message），域没有被设置，确切的消息是根据语言确定的，详见generated code guide对于可重复域的默认值是空（通常情况下是对应语言中空列表）
 
 ## 枚举类型
 ```
@@ -117,15 +116,14 @@ message SearchResponse {
   repeated Result results = 1;
 }
 ```
-在 message SearchResponse 中，定义了嵌套消息 Result，并用来定义SearchResponse消息中的results域。
-
-
 
 # 生成 gRPC 代码
 一旦定义好服务，我们可以使用 protocol buffer 编译器 protoc 来生成创建应用所需的特定客户端和服务端的代码 
-当用protocol buffer编译器来运行.proto文件时，编译器将生成所选择语言的代码，这些代码可以操作在.proto文件中定义的消息类型，包括获取、设置字段值，将消息序列化到一个输出流中，以及从一个输入流中解析消息。
 
+当用protocol buffer编译器来运行.proto文件时，编译器将生成所选择语言的代码，这些代码可以操作在.proto文件中定义的消息类型，包括获取、设置字段值，将消息序列化到一个输出流中，以及从一个输入流中解析消息。
+```
 protoc --go_out=plugins=grpc:. test.proto 
+```
 这生成了 test.pb.go ，包含了我们生成的客户端和服务端类，此外还有用于填充、序列化、提取 HelloRequest 和 HelloResponse 消息类型的类。
 
 
@@ -235,7 +233,7 @@ func main() {
 }
 ```
 
-# gRPC 允许你定义四类服务方法
+# gRPC 四类服务方法
 * 单项 RPC，即客户端发送一个请求给服务端，从服务端获取一个应答，就像一次普通的函数调用。
 ```
 rpc SayHello(HelloRequest) returns (HelloResponse){
